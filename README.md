@@ -1,5 +1,5 @@
 
-- [Django Rest Framework](https://www.django-rest-framework.org/)
+# [Django Rest Framework](https://www.django-rest-framework.org/)
 
 ## ✅ **Summary of the Tutorial**
 
@@ -148,7 +148,7 @@ Any client capable of HTTP requests can use the API.
 
 ---
 
-# 📌 **Final Notes From the Tutorial**
+# 📌 **Final Notes**
 
 ### ✔ REST API = Web API
 
