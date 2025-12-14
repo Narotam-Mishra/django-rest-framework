@@ -24,11 +24,15 @@ headers = {
 
 # get_res = requests.get(endpoint, headers=headers)
 
-get_res = requests.get(endpoint)
+get_res = requests.get(endpoint, params={"abc": 123}, json={"query": "Hello Django"})
 
-data = get_res.json()['message']
-# data = get_res.text
+# print raw text response
+# print(get_res.text)
+
+# print status code
+# print(get_res.status_code)
+
+print("Response data:",get_res.json())
 
 # print("Status Code:",get_res.status_code)
-print("data:",data)
 
