@@ -24,7 +24,7 @@ headers = {
 
 # get_res = requests.get(endpoint, headers=headers)
 
-get_res = requests.get(endpoint, params={"abc": 123}, json={"query": "Hello Django"})
+get_res = requests.get(endpoint, json={"product_id": 123})
 
 # print raw text response
 # print(get_res.text)
