@@ -168,10 +168,6 @@ Any client capable of HTTP requests can use the API.
 
 ---
 
-Below is a **clean, structured Markdown summary** of the tutorial transcript, with **all important concepts and pointers highlighted**. I’ve organized it so you can quickly revisit this later as reference notes while building Django APIs.
-
----
-
 ## 1. Running Django Locally for API Testing
 
 ### Using Multiple Terminal Tabs
