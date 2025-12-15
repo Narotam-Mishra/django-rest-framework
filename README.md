@@ -1270,4 +1270,9 @@ Works correctly ✔
 
 ---
 
+
+
+Note - ModelForm is generally preferred for model-related forms because it follows Django's "don't repeat yourself" principle and reduces boilerplate code significantly.
+
+
 summaries this tutorial transcript in markdown form also make note of all important pointers
