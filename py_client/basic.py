@@ -26,12 +26,16 @@ headers = {
 
 get_res = requests.get(endpoint, json={"product_id": 123})
 
+# print headers
+# print("Headers:", get_res.headers)
+
 # print raw text response
-# print(get_res.text)
+# print("Response text:",get_res.text)
 
 # print status code
 # print(get_res.status_code)
 
+# print json response
 print("Response data:",get_res.json())
 
 # print("Status Code:",get_res.status_code)
