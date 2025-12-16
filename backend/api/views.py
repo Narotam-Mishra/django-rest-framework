@@ -7,13 +7,15 @@ from rest_framework.decorators import api_view
 from products.serializers import ProductSerializer
 
 # define functional based view
-@api_view(["GET"])
+@api_view(["POST"])
 def api_home(request, *args, **kwargs):
     """ DRF API View """
-    # get one random Product from the database
-    instance = Product.objects.all().order_by("?").first()
-    data = {}
-    if instance:
-        # data = model_to_dict(instance, fields=['id', 'title', 'price', 'sale_price'])
-        data = ProductSerializer(instance).data
-    return Response(data)    
+    # data = request.data
+    serializer = ProductSerializer(data=request.data)
+    if serializer.is_valid(raise_exception=True):
+        # instance = serializer.save()
+        # instance = form.save()
+        print("Serializer data:",serializer.data)
+        # data = serializer.data
+        return Response(serializer.data)
+    return Response({"invalid":"not good data"}, status=400)    

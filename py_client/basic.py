@@ -24,7 +24,9 @@ headers = {
 
 # get_res = requests.get(endpoint, headers=headers)
 
-get_res = requests.get(endpoint, json={"product_id": 123})
+# get_res = requests.get(endpoint, json={"product_id": 123})
+
+get_res = requests.post(endpoint, json={"title": "abc-dj", "content": "Hello World", "price": "abc123"})
 
 # print headers
 # print("Headers:", get_res.headers)
