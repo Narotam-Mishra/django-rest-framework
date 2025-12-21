@@ -2147,7 +2147,7 @@ Key takeaway:
 
 ---
 
-# 2. CreateAPIView – What It Is
+## 2. CreateAPIView – What It Is
 
 ### Definition
 
@@ -2161,7 +2161,7 @@ Key takeaway:
 
 ---
 
-# 3. Basic CreateAPIView Example
+## 3. Basic CreateAPIView Example
 
 ```python
 # products/views.py
@@ -2183,7 +2183,7 @@ class ProductCreateAPIView(generics.CreateAPIView):
 
 ---
 
-# 4. URL Configuration – Important Detail About Slashes ⚠️
+## 4. URL Configuration – Important Detail About Slashes ⚠️
 
 ### App-level URLs
 
@@ -2218,7 +2218,7 @@ path('/', ProductCreateAPIView.as_view())  # creates double slashes
 
 ---
 
-# 5. Testing the Create API (Python Client)
+## 5. Testing the Create API (Python Client)
 
 ```python
 import requests
@@ -2235,7 +2235,7 @@ print(response.json())
 
 ---
 
-# 6. Serializer Validation Happens Automatically ✅
+## 6. Serializer Validation Happens Automatically ✅
 
 If required fields are missing:
 
@@ -2249,7 +2249,7 @@ No extra code needed.
 
 ---
 
-# 7. Customizing Object Creation with `perform_create()`
+## 7. Customizing Object Creation with `perform_create()`
 
 ### What Is `perform_create()`?
 
@@ -2312,7 +2312,7 @@ def perform_create(self, serializer):
 
 ---
 
-# 8. Assigning the Logged-in User (Common Real-World Use Case)
+## 8. Assigning the Logged-in User (Common Real-World Use Case)
 
 ```python
 def perform_create(self, serializer):
@@ -2327,7 +2327,7 @@ Used when:
 
 ---
 
-# 9. Why Not Put Logic in the Model?
+## 9. Why Not Put Logic in the Model?
 
 This tutorial correctly hints at an important design decision:
 
@@ -2344,7 +2344,7 @@ This tutorial correctly hints at an important design decision:
 
 ---
 
-# 10. Why Not `/create/` in the URL?
+## 10. Why Not `/create/` in the URL?
 
 REST convention:
 
@@ -2360,7 +2360,7 @@ REST convention:
 
 ---
 
-# 11. Key Important Pointers (Exam / Interview Ready)
+## 11. Key Important Pointers (Exam / Interview Ready)
 
 ### ✔ `CreateAPIView`:
 
