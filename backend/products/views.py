@@ -2,8 +2,8 @@ from rest_framework import generics
 from .models import Product
 from .serializers import ProductSerializer
 
-# create view
-class ProductCreateAPIView(generics.CreateAPIView):
+# create view using CreateAPIView
+class ProductListCreateAPIView(generics.ListCreateAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
 
@@ -16,12 +16,21 @@ class ProductCreateAPIView(generics.CreateAPIView):
             content = title
         serializer.save(content=content)
 
-product_create_view = ProductCreateAPIView.as_view()
+product_list_create_view = ProductListCreateAPIView.as_view()
 
-# class based view
+# get view using RetrieveAPIView (class based view)
 class ProductDetailAPIView(generics.RetrieveAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     # lookup_field = 'pk'
 
 product_detail_view = ProductDetailAPIView.as_view()
+
+class ProductListAPIView(generics.ListAPIView):
+    '''
+    it won't be used
+    '''
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+
+product_list_view = ProductListAPIView.as_view()
