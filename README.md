@@ -2668,7 +2668,272 @@ Run Sqlite DB - `sqlite3 backend/db.sqlite3 "SELECT id,title,content,price FROM 
 
 ---
 
-Using Function Based Views For Create Retrieve or List
+## 1. High-Level Summary of Using Function Based Views For Create Retrieve or List
 
+It demonstrates how **Create, Retrieve, and List API behavior** can be implemented using **a single Function-Based View**, instead of multiple generic class-based views.
+
+* Use `@api_view` to enable HTTP methods in FBVs
+* Branch logic based on `request.method`
+* Handle **GET (list + detail)** and **POST (create)** in one function
+* Use URL keyword arguments (`pk`) to distinguish list vs detail
+* Manually serialize querysets and single objects
+* Handle 404 errors using `get_object_or_404` or `Http404`
+* Replicate `perform_create()` logic inside FBVs
+* Test endpoints using the same client scripts
+* Understand **why this approach becomes confusing at scale**
+
+Key lesson:
+
+> **Just because you *can* put everything into one FBV doesn’t mean you *should*.**
+
+---
+
+## 2. The Goal of This Section
+
+The instructor is **not recommending** this approach.
+
+Instead, the goal is to:
+
+* Show **what DRF generic views are doing behind the scenes**
+* Illustrate how HTTP methods map to actions
+* Demonstrate why generic views exist
+
+---
+
+## 3. Single Function-Based View for CRUD (List, Retrieve, Create)
+
+## 3.1 Required Imports
+
+```python
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+from .models import Product
+from .serializers import ProductSerializer
+```
+
+---
+
+## 3.2 Function-Based “All-in-One” View
+
+```python
+@api_view(['GET', 'POST'])
+def product_alt_view(request, pk=None):
+    # CREATE
+    if request.method == 'POST':
+        serializer = ProductSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
+    # LIST or RETRIEVE
+    if request.method == 'GET':
+        if pk is not None:
+            # DETAIL VIEW
+            obj = get_object_or_404(Product, pk=pk)
+            serializer = ProductSerializer(obj)
+            return Response(serializer.data)
+        else:
+            # LIST VIEW
+            queryset = Product.objects.all()
+            serializer = ProductSerializer(queryset, many=True)
+            return Response(serializer.data)
+```
+
+---
+
+## 4. How the Logic Works
+
+### HTTP Method Determines Action
+
+| Method      | Behavior             |
+| ----------- | -------------------- |
+| GET + no pk | List all products    |
+| GET + pk    | Retrieve one product |
+| POST        | Create a new product |
+
+### URL Determines Context
+
+```python
+path('products/', product_alt_view),
+path('products/<int:pk>/', product_alt_view),
+```
+
+---
+
+## 5. Handling 404 Errors
+
+### Option 1: `get_object_or_404` (Recommended)
+
+```python
+obj = get_object_or_404(Product, pk=pk)
+```
+
+Automatically raises a proper 404 response.
+
+---
+
+### Option 2: Manual 404
+
+```python
+from django.http import Http404
+
+try:
+    obj = Product.objects.get(pk=pk)
+except Product.DoesNotExist:
+    raise Http404
+```
+
+Both work, but `get_object_or_404` is cleaner.
+
+---
+
+## 6. Serializer Usage in FBVs
+
+### List Serialization
+
+```python
+serializer = ProductSerializer(queryset, many=True)
+```
+
+### Detail Serialization
+
+```python
+serializer = ProductSerializer(obj)
+```
+
+### Create Serialization
+
+```python
+serializer = ProductSerializer(data=request.data)
+```
+
+This is exactly what generic views automate for you.
+
+---
+
+## 7. Replicating `perform_create()` in FBVs
+
+```python
+serializer = ProductSerializer(data=request.data)
+if serializer.is_valid():
+    serializer.save()
+```
+
+Custom logic example:
+
+```python
+if serializer.is_valid():
+    title = serializer.validated_data.get('title')
+    serializer.save(content=title)
+```
+
+---
+
+## 8. Testing All Scenarios
+
+| Client Script  | Expected Result   |
+| -------------- | ----------------- |
+| `detail.py`    | Retrieve product  |
+| `list.py`      | List all products |
+| `create.py`    | Create product    |
+| `not_found.py` | 404 response      |
+
+Everything works — **but readability suffers**.
+
+---
+
+## 9. Why This Approach Is Problematic ⚠️
+
+### The View Becomes Confusing
+
+```text
+If method == GET
+   If pk exists
+      Do X
+   Else
+      Do Y
+Else if POST
+   Do Z
+```
+
+Hard to:
+
+* Read
+* Maintain
+* Debug
+* Extend
+* Share with team members
+
+---
+
+## 10. Why Generic Views Are Better ✅
+
+### Generic View Equivalent
+
+```python
+class ProductListCreateAPIView(generics.ListCreateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+```
+
+```python
+class ProductDetailAPIView(generics.RetrieveAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+```
+
+### Instantly Understandable
+
+* You know what the view does by its name
+* No conditional logic
+* Fewer bugs
+* Easier collaboration
+
+---
+
+## 11. FBV vs Generic CBV (Reality Check)
+
+| Feature       | FBV                 | Generic CBV |
+| ------------- | ------------------- | ----------- |
+| Flexibility   | High                | High        |
+| Boilerplate   | High                | Low         |
+| Readability   | Low (complex views) | High        |
+| Scalability   | Poor                | Excellent   |
+| Best Use Case | Small logic         | CRUD APIs   |
+
+---
+
+## 12. When FBVs Still Make Sense
+
+FBVs are still great for:
+
+* Non-CRUD endpoints
+* Custom logic-heavy endpoints
+* One-off APIs
+* Webhooks
+* Integration callbacks
+
+---
+
+## 13. Mental Model 🧠
+
+> **FBVs show *how* things work**
+> **Generic CBVs show *what* the endpoint does**
+
+Learn FBVs → Understand DRF
+Use Generic CBVs → Build production APIs
+
+---
+
+## 14. Final Takeaway
+
+* This “alt view” is educational, not recommended
+* Generic views reduce confusion
+* Consistent patterns scale better
+* DRF’s power is in its abstractions
+
+---
 
 summaries this tutorial transcript in markdown form also make note of all important pointers
