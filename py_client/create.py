@@ -12,7 +12,7 @@ data = {
 get_res = requests.post(endpoint, json=data)
 
 # print json response
-print("Response data:",get_res.json())
+print("Create Response data:",get_res.json())
 
 # print("Status Code:",get_res.status_code)
 

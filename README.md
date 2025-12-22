@@ -2936,4 +2936,287 @@ Use Generic CBVs → Build production APIs
 
 ---
 
+## 1️⃣ UpdateAPIView & DestroyAPIView
+
+So far, you’ve implemented:
+
+* **Create** → `CreateAPIView`
+* **List** → `ListAPIView`
+* **Retrieve (Detail)** → `RetrieveAPIView`
+
+In this section, the tutorial covers the remaining **CRUD operations**:
+
+* **Update** → `UpdateAPIView`
+* **Delete** → `DestroyAPIView`
+
+Once these are done, you have **full CRUD support**:
+
+> **C**reate
+> **R**etrieve
+> **U**pdate
+> **D**estroy
+
+⚠️ Important note from the tutorial:
+
+> CRUD works, but **there is no authentication or permission control yet** — meaning *anyone can update or delete anything*.
+> This will be fixed later using **authentication & permissions**.
+
+---
+
+## 2️⃣ UpdateAPIView – Core Idea
+
+### What does `UpdateAPIView` do?
+
+* Updates **an existing object**
+* Uses HTTP methods:
+
+  * `PUT` → full update
+  * `PATCH` → partial update
+* Works almost **identically to `RetrieveAPIView`**
+* Requires:
+
+  * `queryset`
+  * `serializer_class`
+  * `lookup_field` (usually `id`)
+
+---
+
+## 3️⃣ UpdateAPIView – Key Concepts Explained
+
+### 🔹 lookup_field
+
+This tells DRF **how to find the object**.
+
+```python
+lookup_field = "id"
+```
+
+So this URL:
+
+```
+/api/products/5/update/
+```
+
+means:
+
+> Update the product where `id = 5`
+
+---
+
+### 🔹 perform_update()
+
+This method is **optional**, but very powerful.
+
+It runs **after serializer validation** and **before response is returned**.
+
+Use it when:
+
+* You want to modify data before saving
+* You want side effects (logging, auto-filling fields, etc.)
+
+---
+
+## 4️⃣ Basic UpdateAPIView Example
+
+### `views.py`
+
+```python
+from rest_framework.generics import UpdateAPIView
+from .models import Product
+from .serializers import ProductSerializer
+
+class ProductUpdateAPIView(UpdateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    lookup_field = "id"
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+
+        # Custom logic
+        if not instance.content:
+            instance.content = instance.title
+            # No need to call instance.save()
+            # serializer.save() already saved it
+```
+
+---
+
+### `urls.py`
+
+```python
+from django.urls import path
+from .views import ProductUpdateAPIView
+
+urlpatterns = [
+    path("products/<int:id>/update/", ProductUpdateAPIView.as_view()),
+]
+```
+
+---
+
+### 🔹 How the update request works
+
+```http
+PUT /api/products/5/update/
+```
+
+```json
+{
+  "title": "Macbook M5 Pro",
+  "content": "this is latest series in Macbook series M5 pro",
+  "price": 198.65
+}
+```
+
+✅ Updates only the provided fields
+✅ Returns updated JSON data
+
+---
+
+## 5️⃣ DestroyAPIView – Core Idea
+
+### What does `DestroyAPIView` do?
+
+* Deletes an existing object
+* Uses HTTP method:
+
+  * `DELETE`
+* Returns:
+
+  * **HTTP 204 No Content** (no JSON body)
+
+---
+
+## 6️⃣ DestroyAPIView – Key Concepts Explained
+
+### 🔹 perform_destroy()
+
+Runs **right before deletion**.
+
+Use it if:
+
+* You want to log deletions
+* Clean up related data
+* Trigger analytics/events
+
+---
+
+## 7️⃣ Basic DestroyAPIView Example
+
+### `views.py`
+
+```python
+from rest_framework.generics import DestroyAPIView
+from .models import Product
+from .serializers import ProductSerializer
+
+class ProductDestroyAPIView(DestroyAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    lookup_field = "id"
+
+    def perform_destroy(self, instance):
+        # Custom logic before delete
+        print(f"Deleting product: {instance.title}")
+
+        # Actually delete the object
+        super().perform_destroy(instance)
+```
+
+---
+
+### `urls.py`
+
+```python
+from django.urls import path
+from .views import ProductDestroyAPIView
+
+urlpatterns = [
+    path("products/<int:id>/delete/", ProductDestroyAPIView.as_view()),
+]
+```
+
+---
+
+### 🔹 How the delete request works
+
+```http
+DELETE /api/products/10/delete/
+```
+
+**Response**
+
+```
+204 No Content
+```
+
+✔️ Object is permanently deleted
+✔️ No JSON response (important!)
+
+---
+
+## 8️⃣ Common Mistakes Highlighted in the Tutorial
+
+### ❌ Wrong endpoint
+
+Using `/detail/` instead of `/update/` or `/delete/`
+
+→ Results in:
+
+```
+PUT method not allowed
+DELETE method not allowed
+```
+
+✔️ Fix: Ensure the correct URL is used
+
+---
+
+### ❌ Expecting JSON on DELETE
+
+DELETE returns **204**, not JSON
+
+✔️ Fix:
+
+* Check status code instead of response body
+
+---
+
+## 9️⃣ Important Takeaways (Very Important)
+
+### ✅ Update & Destroy views:
+
+* Are **nearly identical to Detail views**
+* Differ mainly by:
+
+  * HTTP method
+  * Behavior (save vs delete)
+
+---
+
+### ⚠️ Major Security Warning
+
+At this stage:
+
+* ❌ No authentication
+* ❌ No permissions
+* ❌ Anyone can update/delete anything
+
+➡️ **Never ship this to production**
+
+---
+
+## 10️⃣ Mental Model (Easy to Remember)
+
+| Action | DRF View Class    | HTTP Method |
+| ------ | ----------------- | ----------- |
+| List   | `ListAPIView`     | GET         |
+| Create | `CreateAPIView`   | POST        |
+| Detail | `RetrieveAPIView` | GET         |
+| Update | `UpdateAPIView`   | PUT/PATCH   |
+| Delete | `DestroyAPIView`  | DELETE      |
+
+---
+
 summaries this tutorial transcript in markdown form also make note of all important pointers
