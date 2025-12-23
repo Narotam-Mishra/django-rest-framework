@@ -1,18 +1,24 @@
-
 import requests
 
 endpoint = "http://localhost:8000/api/products/"
 
-data = {
-    "title": "IPhone17 pro",
-    "content": "IPhone 17 pro from Apple",
-    "price": 123.11,
-}
+title = input("Title: ").strip()
+price_raw = input("Price (e.g. 19.99): ").strip()
+content = input("Content (optional, press Enter to use title): ").strip()
 
-get_res = requests.post(endpoint, json=data)
+try:
+    price = float(price_raw) if price_raw else None
+except ValueError:
+    print("Invalid price; using null")
+    price = None
 
-# print json response
-print("Create Response data:",get_res.json())
+payload = {"title": title}
+if price is not None:
+    payload["price"] = price
+if content:
+    payload["content"] = content
+else:
+    payload["content"] = title
 
-# print("Status Code:",get_res.status_code)
-
+res = requests.post(endpoint, json=payload)
+print("Create Response data:", res.json())

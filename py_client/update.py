@@ -1,19 +1,30 @@
-
 import requests
 
-endpoint = "http://localhost:8000/api/products/1/update/"
+pk = input("Product id to update: ").strip()
+if not pk.isdigit():
+    raise SystemExit("Invalid id")
 
-data = {
-    "title": "Macbook M5 Pro",
-    "content": "this is latest series in Macbook series M5 pro",
-    "price": 198.65
-}
+endpoint = f"http://localhost:8000/api/products/{pk}/update/"
 
+print("Leave a field empty to skip updating it.")
+title = input("New Title: ").strip()
+content = input("New Content: ").strip()
+price_raw = input("New Price (e.g. 29.99): ").strip()
 
-get_res = requests.put(endpoint, json=data)
+payload = {}
+if title:
+    payload["title"] = title
+if content:
+    payload["content"] = content
+if price_raw:
+    try:
+        payload["price"] = float(price_raw)
+    except ValueError:
+        print("Invalid price input — skipping price")
 
-# print json response
-print("Update Response data:",get_res.json())
+if not payload:
+    print("Nothing to update; exiting.")
+    raise SystemExit
 
-# print("Status Code:",get_res.status_code)
-
+res = requests.patch(endpoint, json=payload)
+print("Update Response data:", res.json())
