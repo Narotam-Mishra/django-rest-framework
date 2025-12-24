@@ -2386,7 +2386,7 @@ REST convention:
 
 ---
 
-# 12. Mental Model to Remember 🧠
+## 12. Mental Model to Remember 🧠
 
 > **CreateAPIView = POST handler + validation + save + response**
 
@@ -3580,6 +3580,294 @@ HTTP Method → CBV Method → Mixin Method → Serializer → Response
 ```
 
 - [Mixins](https://www.django-rest-framework.org/api-guide/generic-views/#mixins)
+
+---
+
+## 1️⃣ Big Picture: Session Authentication & Permissions
+
+### Authentication
+
+👉 **Who are you?**
+Example: logged-in user, admin, anonymous user
+
+### Permissions
+
+👉 **What are you allowed to do?**
+Example: read only, create, update, delete
+
+📌 **Permissions always depend on authentication**
+
+---
+
+## 2️⃣ Why This Matters
+
+Before this:
+
+* Anyone could:
+
+  * Create products
+  * Update products
+  * Delete products
+
+❌ That’s dangerous
+✅ We now **lock things down**
+
+---
+
+## 3️⃣ Permission Classes (First Concept)
+
+DRF allows permissions on **generic views** very easily.
+
+### Import
+
+```python
+from rest_framework import permissions
+```
+
+---
+
+## 🔹 IsAuthenticated
+
+```python
+permission_classes = [permissions.IsAuthenticated]
+```
+
+### Behavior
+
+| User      | Result      |
+| --------- | ----------- |
+| Logged in | ✅ Allowed   |
+| Anonymous | ❌ 401 / 403 |
+
+### Example View
+
+```python
+class ProductListCreateAPIView(ListCreateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [permissions.IsAuthenticated]
+```
+
+### Result
+
+* Browser (not logged in): ❌
+* API client (no auth): ❌
+* Logged-in admin user: ✅
+
+---
+
+## 🔹 IsAuthenticatedOrReadOnly (Very Common)
+
+```python
+permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+```
+
+### Meaning
+
+| HTTP Method | Allowed?    |
+| ----------- | ----------- |
+| GET         | ✅ Anyone    |
+| POST        | ❌ Anonymous |
+| PUT         | ❌ Anonymous |
+| DELETE      | ❌ Anonymous |
+
+### Why it’s useful
+
+* Public data
+* Protected writes
+
+### Example
+
+```python
+class ProductListCreateAPIView(ListCreateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+```
+
+### Result
+
+* GET `/products/` → works
+* POST `/products/` → ❌ unless logged in
+
+---
+
+## 4️⃣ Understanding Status Codes (Important Detail)
+
+| Status Code | Meaning                 |
+| ----------- | ----------------------- |
+| 401 / 403   | Permission denied       |
+| 405         | HTTP method not allowed |
+
+📌 Example:
+
+* `POST` on ListAPIView → 405 (view doesn’t support POST)
+* `POST` with no auth → 403 (permission denied)
+
+This distinction is **very important** for API clients.
+
+---
+
+## 5️⃣ Authentication Classes (Second Concept)
+
+Permissions check **who is authenticated**, but authentication defines **how**.
+
+### Import
+
+```python
+from rest_framework import authentication
+```
+
+---
+
+## 🔹 SessionAuthentication
+
+```python
+authentication_classes = [authentication.SessionAuthentication]
+```
+
+### What it uses
+
+* Django login session
+* Cookies
+* CSRF protection
+
+### Typical Use Case
+
+✔ Traditional Django apps
+✔ Django Admin
+✔ React / JS frontend served by Django
+
+---
+
+### Full Example View
+
+```python
+class ProductListCreateAPIView(ListCreateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+
+    authentication_classes = [authentication.SessionAuthentication]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+```
+
+---
+
+## 6️⃣ Why Browser Works but API Client Doesn’t
+
+### Browser (Browsable API)
+
+* You logged into `/admin`
+* Django created a session
+* Session cookie is sent automatically
+* ✅ Authenticated
+
+### Python API Client
+
+* No session
+* No cookies
+* ❌ Anonymous
+
+That’s why:
+
+```
+Authentication credentials were not provided
+```
+
+📌 **Nothing is wrong** — this is expected.
+
+---
+
+## 7️⃣ Creating a Superuser (Demo Purpose)
+
+```bash
+python manage.py createsuperuser
+```
+
+Once logged in:
+
+* Browsable API shows:
+
+  * Logged-in user
+  * POST form enabled
+* You can create objects visually
+
+---
+
+## 8️⃣ When SessionAuthentication Makes Sense
+
+✅ Best for:
+
+* Django + React
+* Django + templates
+* Internal admin dashboards
+
+❌ Not ideal for:
+
+* Mobile apps
+* External APIs
+* Python scripts
+* Third-party consumers
+
+📌 Why?
+Because sessions require:
+
+* Cookies
+* Browser-like behavior
+
+---
+
+## 9️⃣ Why Your Python Client Still Fails
+
+```python
+requests.post("http://localhost:8000/api/products/")
+```
+
+❌ No session
+❌ No cookies
+❌ Not logged in
+
+✔ Works only if:
+
+* You manually handle cookies
+* Or use browser automation (Selenium)
+
+---
+
+## 🔑 Key Insight
+
+> **Session authentication is browser-first authentication**
+
+For real APIs, we usually want:
+
+* Token authentication
+* JWT authentication
+
+That’s exactly what comes next.
+
+---
+
+## 10️⃣ Summary of Built-In Permissions (Must Remember)
+
+| Permission                | Use Case                   |
+| ------------------------- | -------------------------- |
+| AllowAny                  | Public API                 |
+| IsAuthenticated           | Private API                |
+| IsAdminUser               | Admin-only                 |
+| IsAuthenticatedOrReadOnly | Public read, private write |
+| DjangoModelPermissions    | Model-based access         |
+
+---
+
+## 11️⃣ Key Takeaways (Exam / Interview Ready)
+
+✅ Permissions decide **what you can do**
+✅ Authentication decides **who you are**
+✅ SessionAuthentication uses Django login
+✅ Browsable API auto-uses sessions
+✅ API clients need token-based auth
+
+- [Permissions](https://www.django-rest-framework.org/api-guide/permissions/)
 
 ---
 
