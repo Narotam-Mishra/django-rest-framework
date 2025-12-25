@@ -3871,4 +3871,309 @@ That’s exactly what comes next.
 
 ---
 
+## Django User & Group Permissions with `DjangoModelPermissions` 
+
+## 1. Big Picture: User & Group Permissions with DjangoModelPermissions
+
+The tutorial shows:
+
+* How **Django’s built-in model permissions** work
+* How **users vs groups** affect permissions
+* How **Django Admin permissions ≠ DRF API permissions**
+* Why **`DjangoModelPermissions` alone is not enough**
+* Why we eventually need **custom permissions**
+
+---
+
+## 2. Django Model Permissions (Auto-Created)
+
+For every Django model, Django automatically creates **4 permissions**:
+
+| Permission | Codename           |
+| ---------- | ------------------ |
+| Add        | `add_modelname`    |
+| Change     | `change_modelname` |
+| Delete     | `delete_modelname` |
+| View       | `view_modelname`   |
+
+Example for `Product` model:
+
+```
+add_product
+change_product
+delete_product
+view_product
+```
+
+These permissions are:
+
+* Stored in the database
+* Used by **Django Admin**
+* Can be assigned to **users or groups**
+
+---
+
+## 3. Users vs Groups (Very Important)
+
+### Two Ways Permissions Can Be Given
+
+1. **Directly to a User**
+2. **Via a Group the User Belongs To**
+
+Permissions are **additive**:
+
+> User permissions + Group permissions = final permissions
+
+### Best Practice
+
+✅ **Use groups**
+❌ Avoid assigning permissions directly to users
+
+---
+
+## 4. Admin Example (What the Tutorial Did)
+
+### Step 1: Create a Staff User
+
+* `is_staff = True`
+* Not a superuser
+
+Result:
+❌ Cannot see any models in admin
+
+---
+
+### Step 2: Give `view_product` Permission
+
+Admin → User → Permissions → `Can view product`
+
+Result:
+✅ User can **see products**
+❌ Cannot edit / delete
+
+Admin shows **read-only view**
+
+---
+
+### Step 3: Create Group: `staff_product_editor`
+
+Permissions given to group:
+
+* `view_product`
+* `add_product`
+* `change_product`
+
+User added to this group.
+
+Result:
+✅ User can view, add, edit products
+❌ Still not a superuser
+
+---
+
+## 5. Bringing This Into DRF (API Side)
+
+### Initial API View
+
+```python
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
+
+class ProductListCreateView(generics.ListCreateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+```
+
+🔴 Problem:
+
+* Any authenticated user can POST
+* Permissions are **not tied to Django model permissions**
+
+---
+
+## 6. Using `DjangoModelPermissions`
+
+### Change Permission Class
+
+```python
+from rest_framework.permissions import DjangoModelPermissions
+
+class ProductListCreateView(generics.ListCreateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [DjangoModelPermissions]
+```
+
+### What This Does
+
+DRF now checks permissions based on HTTP method:
+
+| HTTP Method | Required Permission         |
+| ----------- | --------------------------- |
+| GET         | ❌ **No permission checked** |
+| POST        | `add_product`               |
+| PUT/PATCH   | `change_product`            |
+| DELETE      | `delete_product`            |
+
+---
+
+## 7. 🔥 Critical Issue Discovered in Tutorial
+
+### Scenario
+
+Staff user has:
+❌ NO `view_product` permission
+
+Yet:
+
+```http
+GET /api/products/
+```
+
+👉 **Still returns all products**
+
+### Why?
+
+Because:
+
+* `GET`, `HEAD`, `OPTIONS` are considered **SAFE METHODS**
+* `DjangoModelPermissions` **does NOT check `view_*` permission**
+* It only protects **write operations**
+
+This is default DRF behavior.
+
+---
+
+## 8. Another Big Gotcha: Permissions Are Per-View
+
+### What Went Wrong?
+
+* List view had `DjangoModelPermissions`
+* Update view **did NOT**
+
+So user could:
+❌ Edit product via API
+❌ Even though admin blocked it
+
+### Lesson
+
+> **Permissions must be applied to EVERY view**
+
+---
+
+## 9. Why `view_model` Permission Is Ignored by Default
+
+DRF assumes:
+
+* Reading data is public unless restricted
+* Model permissions exist mainly for **mutations**
+
+So:
+
+* `view_product` is ignored unless you explicitly enforce it
+
+---
+
+## 10. Why Custom Permissions Are Needed
+
+### Problems with `DjangoModelPermissions`
+
+1. ❌ GET requests not protected
+2. ❌ `view_model` permission ignored
+3. ❌ Easy to forget permissions on some views
+4. ❌ API behavior doesn’t match Admin behavior
+
+---
+
+## 11. Custom Permission (Basic Example)
+
+### Goal
+
+Require:
+
+* `view_product` for GET
+* `add_product` for POST
+* `change_product` for PUT/PATCH
+* `delete_product` for DELETE
+
+---
+
+### Custom Permission Class
+
+```python
+from rest_framework.permissions import BasePermission, SAFE_METHODS
+
+class ProductPermissions(BasePermission):
+
+    def has_permission(self, request, view):
+        user = request.user
+
+        if not user.is_authenticated:
+            return False
+
+        if request.method in SAFE_METHODS:
+            return user.has_perm("products.view_product")
+
+        if request.method == "POST":
+            return user.has_perm("products.add_product")
+
+        if request.method in ["PUT", "PATCH"]:
+            return user.has_perm("products.change_product")
+
+        if request.method == "DELETE":
+            return user.has_perm("products.delete_product")
+
+        return False
+```
+
+---
+
+### Apply It to Views
+
+```python
+class ProductListCreateView(generics.ListCreateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [ProductPermissions]
+```
+
+Now:
+
+* API behavior matches admin behavior ✅
+* No accidental data leaks ✅
+
+---
+
+## 12. Key Takeaways (Exam / Interview Ready)
+
+### ✅ Django Model Permissions
+
+* Auto-created per model
+* Used by Admin
+* Can be reused in DRF
+
+### ✅ DjangoModelPermissions
+
+* Protects **write operations only**
+* Ignores `view_model`
+* Must be applied per-view
+
+### ❌ Common Mistakes
+
+* Forgetting permissions on update/delete views
+* Assuming admin permissions apply to API
+* Relying only on `IsAuthenticated`
+
+### ✅ Best Practice
+
+* Use **groups**
+* Create **custom permission classes**
+* Apply permissions **globally or consistently**
+* Explicitly protect GET if data is sensitive
+
+- [DjangoModelPermissions](https://www.django-rest-framework.org/api-guide/permissions/#djangomodelpermissions)
+
+---
+
 summaries this tutorial transcript in markdown form also make note of all important pointers

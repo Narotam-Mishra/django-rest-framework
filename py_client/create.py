@@ -2,6 +2,10 @@ import requests
 
 endpoint = "http://localhost:8000/api/products/"
 
+# http://localhost:8000/admin/
+# session -> post data
+# selenium
+
 title = input("Title: ").strip()
 price_raw = input("Price (e.g. 19.99): ").strip()
 content = input("Content (optional, press Enter to use title): ").strip()
