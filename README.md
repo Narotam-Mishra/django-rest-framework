@@ -4176,4 +4176,302 @@ Now:
 
 ---
 
+## Custom Permissions in Django REST Framework
+
+## 1. What Problem Are We Solving?
+
+### The core issue:
+
+* In **Django Admin**, a staff user with no permissions:
+
+  * ❌ Cannot view products
+  * ❌ Cannot edit products
+* In **DRF API**, the same user:
+
+  * ✅ Can still `GET /api/products/`
+  * ❌ Might not be able to edit — but **can still see everything**
+
+👉 **Admin permissions ≠ API permissions**
+
+This mismatch is dangerous.
+
+---
+
+## 2. Why `DjangoModelPermissions` Is Not Enough
+
+By default, `DjangoModelPermissions`:
+
+| HTTP Method | Permission Checked |
+| ----------- | ------------------ |
+| GET         | ❌ none             |
+| POST        | `add_model`        |
+| PUT / PATCH | `change_model`     |
+| DELETE      | `delete_model`     |
+
+### Result:
+
+* Users without `view_model` can still **read data**
+* This is why your staff user could still see all products
+
+👉 **We need to enforce `view_model` permission**
+
+---
+
+## 3. What Are Custom Permissions in DRF?
+
+A **custom permission** is a class that decides:
+
+> “Should this user be allowed to do this action?”
+
+You implement one (or both) of these methods:
+
+```python
+has_permission(self, request, view)         # view-level
+has_object_permission(self, request, view, obj)  # object-level
+```
+
+---
+
+## 4. Examples from DRF Docs (Conceptual)
+
+### Blocklist Permission (IP-based)
+
+```python
+class BlocklistPermission(BasePermission):
+    def has_permission(self, request, view):
+        return request.META["REMOTE_ADDR"] not in BLOCKED_IPS
+```
+
+### Owner-Only Editing
+
+```python
+class IsOwnerOrReadOnly(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return True
+        return obj.owner == request.user
+```
+
+👉 These examples show:
+
+* **Global rules** → `has_permission`
+* **Object-specific rules** → `has_object_permission`
+
+---
+
+## 5. Creating Our Custom Permission (Tutorial Path)
+
+### Step 1: Create `permissions.py`
+
+```python
+# products/permissions.py
+from rest_framework.permissions import DjangoModelPermissions
+```
+
+---
+
+### Step 2: Extend `DjangoModelPermissions`
+
+Why?
+
+* It already knows how to check:
+
+  * `add`
+  * `change`
+  * `delete`
+* We just want to **add `view` permission support**
+
+```python
+class IsStaffEditorPermission(DjangoModelPermissions):
+    pass
+```
+
+---
+
+## 6. Understanding Permission Strings (Very Important)
+
+Format:
+
+```
+app_label.action_modelname
+```
+
+Examples for `Product` model in `products` app:
+
+```text
+products.view_product
+products.add_product
+products.change_product
+products.delete_product
+```
+
+---
+
+## 7. The Initial (Wrong) Custom Permission Attempt
+
+### ❌ What went wrong:
+
+```python
+if user.has_perm("products.view_product"):
+    return True
+
+if user.has_perm("products.change_product"):
+    return True
+```
+
+### Why this fails:
+
+* If **any permission** is true → everything becomes allowed
+* A user with `view_product` could edit products 😬
+
+👉 **Permissions must be tied to HTTP methods**
+
+---
+
+## 8. The Correct Way: Override `perms_map`
+
+This is the **key lesson** of the tutorial.
+
+### Default `DjangoModelPermissions` mapping (simplified):
+
+```python
+perms_map = {
+    "POST": ["%(app_label)s.add_%(model_name)s"],
+    "PUT": ["%(app_label)s.change_%(model_name)s"],
+    "PATCH": ["%(app_label)s.change_%(model_name)s"],
+    "DELETE": ["%(app_label)s.delete_%(model_name)s"],
+}
+```
+
+### It does NOT include `GET`
+
+---
+
+## 9. Custom Permission That FIXES Everything
+
+### ✅ Final Custom Permission Class
+
+```python
+from rest_framework.permissions import DjangoModelPermissions
+
+class IsStaffEditorPermission(DjangoModelPermissions):
+    perms_map = {
+        "GET": ["%(app_label)s.view_%(model_name)s"],
+        "OPTIONS": [],
+        "HEAD": [],
+        "POST": ["%(app_label)s.add_%(model_name)s"],
+        "PUT": ["%(app_label)s.change_%(model_name)s"],
+        "PATCH": ["%(app_label)s.change_%(model_name)s"],
+        "DELETE": ["%(app_label)s.delete_%(model_name)s"],
+    }
+
+    def has_permission(self, request, view):
+        # Must be staff
+        if not request.user.is_staff:
+            return False
+        return super().has_permission(request, view)
+```
+
+### What this achieves:
+
+* GET → requires `view_product`
+* POST → requires `add_product`
+* PUT/PATCH → requires `change_product`
+* DELETE → requires `delete_product`
+* Non-staff users → ❌ denied
+
+✅ Admin and API behavior now match
+
+---
+
+## 10. Applying the Permission to Views
+
+```python
+from .permissions import IsStaffEditorPermission
+
+class ProductListCreateView(ListCreateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [IsStaffEditorPermission]
+```
+
+---
+
+## 11. Combining Permissions (Very Important)
+
+### Example:
+
+```python
+permission_classes = [
+    permissions.IsAdminUser,
+    IsStaffEditorPermission
+]
+```
+
+### Rules:
+
+* Permissions are evaluated **top to bottom**
+* First failure = request denied
+
+👉 Ordering matters!
+
+---
+
+## 12. Staff vs Admin (Clarified)
+
+| Role           | Meaning                         |
+| -------------- | ------------------------------- |
+| `is_staff`     | Can access admin (if permitted) |
+| `is_superuser` | Bypasses all permission checks  |
+| `IsAdminUser`  | Checks `is_staff=True`          |
+
+---
+
+## 13. Why the API Client (Python `requests`) Failed
+
+```python
+client.get("/api/products/")
+```
+
+❌ Failed because:
+
+* API now requires authentication
+* No token / session provided
+
+👉 This sets up the **next topic: Token Authentication**
+
+---
+
+## 14. Key Takeaways (Interview-Ready)
+
+### ✅ Core Lessons
+
+* Django Admin permissions do NOT protect APIs
+* `DjangoModelPermissions` ignores `view_model`
+* Always enforce permissions per HTTP method
+* Extend built-in permissions — don’t reinvent them
+* Use **least privilege** by default
+
+### ❌ Common Mistakes
+
+* Assuming GET is safe
+* Forgetting permission ordering
+* Writing `has_permission` without method checks
+* Giving users direct permissions instead of groups
+
+---
+
+## 15. Mental Model (One Line)
+
+> **Authentication answers “who are you?”
+> Permissions answer “what are you allowed to do?”**
+
+- What it is: owner = models.ForeignKey(User) declares a many-to-one DB relationship where each model instance references one User, and a User can own many instances.
+
+- Note - user.is_staff is a boolean field on Django's User model that marks whether the account is allowed access to admin/staff-only areas — it is defined by Django (on AbstractUser) not by DRF.
+
+---
+
+- [Custom permissions](https://www.django-rest-framework.org/api-guide/permissions/#custom-permissions)
+
 summaries this tutorial transcript in markdown form also make note of all important pointers
