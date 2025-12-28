@@ -12,11 +12,13 @@ from api.authentication import TokenAuthentication
 class ProductListCreateAPIView(generics.ListCreateAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+
     # authentication and authorization
-    authentication_classes = [
-        authentication.SessionAuthentication,
-        TokenAuthentication,
-    ]
+    # authentication_classes = [
+    #     authentication.SessionAuthentication,
+    #     TokenAuthentication,
+    # ]
+
     permission_classes = [permissions.IsAdminUser, IsDevEditorPemission]
 
     def perform_create(self, serializer):
@@ -34,6 +36,7 @@ product_list_create_view = ProductListCreateAPIView.as_view()
 class ProductDetailAPIView(generics.RetrieveAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    permission_classes = [permissions.IsAdminUser, IsDevEditorPemission]
     # lookup_field = 'pk'
 
 product_detail_view = ProductDetailAPIView.as_view()
@@ -50,6 +53,7 @@ product_detail_view = ProductDetailAPIView.as_view()
 class ProductUpdateAPIView(generics.UpdateAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    permission_classes = [permissions.IsAdminUser, IsDevEditorPemission]
     lookup_field = 'pk'
 
     def perform_update(self, serializer):
@@ -62,6 +66,7 @@ product_update_view = ProductUpdateAPIView.as_view()
 class ProductDestroyAPIView(generics.DestroyAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    permission_classes = [permissions.IsAdminUser, IsDevEditorPemission]
     lookup_field = 'pk'
 
     def perform_destroy(self, instance):
