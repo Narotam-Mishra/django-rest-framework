@@ -4470,8 +4470,354 @@ client.get("/api/products/")
 
 - Note - user.is_staff is a boolean field on Django's User model that marks whether the account is allowed access to admin/staff-only areas — it is defined by Django (on AbstractUser) not by DRF.
 
+- [Custom permissions](https://www.django-rest-framework.org/api-guide/permissions/#custom-permissions)
+
 ---
 
-- [Custom permissions](https://www.django-rest-framework.org/api-guide/permissions/#custom-permissions)
+## Token Authentication in Django REST Framework
+
+## 1. Why Token Authentication Is Needed
+
+### Problem recap
+
+* **Session Authentication** works only for:
+
+  * Browsers
+  * Django Admin
+  * Same-site JavaScript (React, etc.)
+* ❌ Python clients (`requests`, scripts, mobile apps) **cannot reuse browser sessions**
+
+👉 **Token Authentication** allows **any external client** to securely talk to your API.
+
+---
+
+## 2. What Is Token Authentication?
+
+* Server issues a **unique token** to a user after login
+* Client sends that token with every request
+* Server validates token → identifies user → checks permissions
+
+### Mental model:
+
+```
+username + password  →  token
+token → access API
+```
+
+---
+
+## 3. Enable Token Authentication in Django
+
+### Step 1: Install app
+
+```python
+# settings.py
+INSTALLED_APPS = [
+    ...
+    "rest_framework",
+    "rest_framework.authtoken",
+]
+```
+
+### Step 2: Run migrations
+
+```bash
+python manage.py migrate
+```
+
+This creates a `Token` table in the database.
+
+---
+
+## 4. Token Model (Important Insight)
+
+Each token record contains:
+
+* `key` → actual token string
+* `user` → linked user
+* `created` → timestamp
+
+```python
+from rest_framework.authtoken.models import Token
+
+Token.objects.all()
+```
+
+👉 Tokens **do not expire by default**
+
+---
+
+## 5. Create an API Endpoint to Generate Tokens
+
+### Add token endpoint in `urls.py`
+
+```python
+from rest_framework.authtoken.views import obtain_auth_token
+
+urlpatterns = [
+    path("api/auth/", obtain_auth_token),
+]
+```
+
+### How it works:
+
+* Accepts `username` + `password`
+* Returns a token
+
+Example response:
+
+```json
+{
+  "token": "abc123xyz..."
+}
+```
+
+---
+
+## 6. Protect API Views with TokenAuthentication
+
+### Update your API view
+
+```python
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+
+class ProductListCreateView(ListCreateAPIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+```
+
+Now:
+
+* ❌ No token → access denied
+* ✅ Valid token → access granted
+
+---
+
+## 7. Python Client: Authenticating with Token
+
+### Step 1: Get credentials securely
+
+```python
+from getpass import getpass
+import requests
+
+username = input("Username: ")
+password = getpass("Password: ")
+```
+
+---
+
+### Step 2: Request a token
+
+```python
+auth_url = "http://localhost:8000/api/auth/"
+
+auth_response = requests.post(auth_url, data={
+    "username": username,
+    "password": password
+})
+
+token = auth_response.json()["token"]
+```
+
+---
+
+### Step 3: Send token in headers
+
+```python
+headers = {
+    "Authorization": f"Token {token}"
+}
+
+response = requests.get(
+    "http://localhost:8000/api/products/",
+    headers=headers
+)
+
+print(response.json())
+```
+
+✅ Your Python client is now authenticated
+
+---
+
+## 8. Why Tokens Don’t Change Every Login
+
+* Tokens are **persistent**
+* Same user → same token (unless deleted)
+
+### Pros
+
+* Simple
+* Fast
+* Stateless
+
+### Cons
+
+* No automatic expiration
+* Must be manually revoked
+
+---
+
+## 9. Revoking Tokens (Logout)
+
+### Delete token manually
+
+```python
+Token.objects.filter(user=user).delete()
+```
+
+Effect:
+
+* Token immediately becomes invalid
+* Client must log in again
+
+API response:
+
+```json
+{
+  "detail": "Invalid token."
+}
+```
+
+---
+
+## 10. Token Expiration (Advanced Concept)
+
+DRF tokens **do not expire by default**, but you can:
+
+### Option 1: Cron / Celery job
+
+```python
+Token.objects.filter(
+    created__lt=timezone.now() - timedelta(days=7)
+).delete()
+```
+
+### Option 2: Custom Token Model
+
+* Add `expires` field
+* Validate expiration on each request
+
+### Option 3: Third-party packages
+
+* `djangorestframework-simplejwt`
+* OAuth2 providers
+
+---
+
+## 11. Using `Bearer` Instead of `Token`
+
+### Why?
+
+Industry standard header:
+
+```
+Authorization: Bearer <token>
+```
+
+---
+
+### Custom Token Authentication
+
+```python
+# api/authentication.py
+from rest_framework.authentication import TokenAuthentication
+
+class BearerTokenAuthentication(TokenAuthentication):
+    keyword = "Bearer"
+```
+
+---
+
+### Use it in views
+
+```python
+from api.authentication import BearerTokenAuthentication
+
+class ProductListCreateView(ListCreateAPIView):
+    authentication_classes = [BearerTokenAuthentication]
+```
+
+---
+
+### Python client change
+
+```python
+headers = {
+    "Authorization": f"Bearer {token}"
+}
+```
+
+✅ Same token, different keyword
+
+---
+
+## 12. How Token Authentication Fits with Permissions
+
+Flow for **every request**:
+
+```
+1. Authentication (Who are you?)
+2. Permission checks (What can you do?)
+3. View logic runs
+```
+
+Example:
+
+* Token valid → user identified
+* Permission class checks:
+
+  * `is_staff`
+  * `view_product`
+* Request allowed or denied
+
+---
+
+## 13. Security Best Practices (Important)
+
+✅ Use HTTPS always
+✅ Store tokens securely (env, vault, keychain)
+✅ Rotate tokens for sensitive access
+✅ Delete tokens on logout
+❌ Never hardcode tokens
+❌ Never log tokens
+
+---
+
+## 14. When to Use Which Authentication
+
+| Use case               | Best choice           |
+| ---------------------- | --------------------- |
+| Django Admin / Browser | SessionAuthentication |
+| Python scripts         | TokenAuthentication   |
+| Mobile apps            | Token / JWT           |
+| Third-party APIs       | Token / OAuth         |
+| Large systems          | JWT / OAuth2          |
+
+---
+
+## 15. Key Takeaways (Exam / Interview Ready)
+
+* Token Authentication enables **stateless API access**
+* Tokens identify users, not sessions
+* Tokens must be sent in `Authorization` header
+* Tokens don’t expire by default
+* Permissions still apply after authentication
+* You can customize:
+
+  * Token header keyword
+  * Expiry logic
+  * Storage model
+
+---
+
+## 16. One-Line Summary
+
+> **Session auth is for browsers.
+> Token auth is for APIs.**
+
+---
 
 summaries this tutorial transcript in markdown form also make note of all important pointers

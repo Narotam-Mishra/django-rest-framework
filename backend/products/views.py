@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from django.shortcuts import get_object_or_404
 from .permissions import IsDevEditorPemission
+from api.authentication import TokenAuthentication
 # from django.http import Http404
 
 # create view using CreateAPIView
@@ -12,7 +13,10 @@ class ProductListCreateAPIView(generics.ListCreateAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     # authentication and authorization
-    authentication_classes = [authentication.SessionAuthentication]
+    authentication_classes = [
+        authentication.SessionAuthentication,
+        TokenAuthentication,
+    ]
     permission_classes = [permissions.IsAdminUser, IsDevEditorPemission]
 
     def perform_create(self, serializer):

@@ -1,5 +1,9 @@
 import requests
 
+headers = {
+    'Authorization': 'Bearer d6585204773c390c5e56cae2563c5e27f2c150ff'
+}
+
 endpoint = "http://localhost:8000/api/products/"
 
 # http://localhost:8000/admin/
@@ -24,5 +28,5 @@ if content:
 else:
     payload["content"] = title
 
-res = requests.post(endpoint, json=payload)
+res = requests.post(endpoint, json=payload, headers=headers)
 print("Create Response data:", res.json())
