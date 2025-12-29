@@ -6084,4 +6084,51 @@ POST /api/products/
 
 ---
 
+## **DRF `reverse` — Useful & Important Pointers**
+
+- **What it is:** `rest_framework.reverse.reverse` builds a URL from a view name and kwargs. Unlike Django's `reverse`, it accepts a `request` and `format` argument so it can return absolute URLs (including scheme and host) useful for APIs.
+
+- **Why use it in serializers:** Serializers often expose links (self/detail URLs or related resource URLs). Using DRF's `reverse` inside a serializer (usually in a `SerializerMethodField`) produces correct, fully-qualified links when the serializer receives `context={'request': request}` from a view.
+
+- **Common pattern (SerializerMethodField):**
+
+  ```python
+  from rest_framework import serializers
+  from rest_framework.reverse import reverse
+
+  class ProductSerializer(serializers.ModelSerializer):
+      url = serializers.SerializerMethodField()
+
+      class Meta:
+          model = Product
+          fields = ['id', 'name', 'url']
+
+      def get_url(self, obj):
+          request = self.context.get('request')
+          return reverse('product-detail', kwargs={'pk': obj.pk}, request=request)
+  ```
+
+- **Simpler alternative — hyperlinked fields:** Use `HyperlinkedModelSerializer` or `HyperlinkedIdentityField` for standard self-links to avoid manual `reverse` calls:
+
+  ```python
+  class ProductHyperlinkSerializer(serializers.HyperlinkedModelSerializer):
+      class Meta:
+          model = Product
+          fields = ['url', 'id', 'name']
+          extra_kwargs = {'url': {'view_name': 'product-detail'}}
+  # or
+  url = serializers.HyperlinkedIdentityField(view_name='product-detail')
+  ```
+
+- **Important: view names and routers** — When using `DefaultRouter` and `router.register('products', ProductViewSet)`, DRF creates named routes like `product-list` and `product-detail`. Use those names with `reverse` or hyperlinked fields.
+
+- **DRF `reverse` vs Django `reverse`:** DRF's `reverse(..., request=request)` can return absolute URLs; Django's `django.urls.reverse` returns a path only (use `request.build_absolute_uri()` to make it absolute).
+
+- **Best practices:**
+  - Prefer hyperlinked serializers for simple self-links.
+  - Use `SerializerMethodField` + `reverse` for custom or conditional links.
+  - Ensure your view passes the `request` in serializer context (generic views and viewsets do this automatically).
+
+---
+
 summaries this tutorial transcript in markdown form also make note of all important pointers
