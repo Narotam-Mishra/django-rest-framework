@@ -6078,10 +6078,6 @@ POST /api/products/
 
 - “DRF serializers should expose navigable URLs using `reverse` or `HyperlinkedIdentityField` to keep APIs decoupled from URL structure.”
 
-- What reverse is: reverse from rest_framework.reverse builds a URL (optionally absolute) from a view name and kwargs, similar to Django's django.urls.reverse but DRF's reverse accepts a request and format param so it can return fully qualified URIs when needed.
-
-- Why use it in serializers: Serializers often include links to related endpoints (self/detail URL, related resource URLs). Using reverse inside a serializer produces correct URLs (including domain, scheme) when the serializer has the request in its context — which makes links usable in APIs and the browsable API.
-
 ---
 
 ## **DRF `reverse` — Useful & Important Pointers**
