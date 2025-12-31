@@ -6127,4 +6127,301 @@ POST /api/products/
 
 ---
 
+## ModelSerializer: `create()` & `update()` — Complete Notes
+
+## Big Idea
+
+This lesson explains:
+
+* How **ModelSerializer actually creates and updates models**
+* How to add **extra fields not present in the model**
+* How to use **write-only fields**
+* When and why to **override `create()` and `update()`**
+* How this relates to `serializer.save()` and `perform_create()`
+
+---
+
+## 1️⃣ Adding a Field That Is NOT in the Model
+
+### Scenario
+
+You want to send an email **when a product is created**, but:
+
+* `email` is **not a Product model field**
+* You still want it accepted in POST requests
+
+---
+
+### ❌ Problem: Normal Field Causes Error
+
+```python
+email = serializers.EmailField()
+```
+
+If you add this to `fields`, DRF tries to do:
+
+```python
+Product.objects.create(email="abc@gmail.com")
+```
+
+❌ Boom → **field does not exist on Product**
+
+---
+
+## 2️⃣ Solution: `write_only=True`
+
+### Concept: `write_only`
+
+* Field is accepted in input (POST / PUT)
+* Field is NOT returned in API response
+* Field is NOT expected on the model
+
+---
+
+### Correct Example
+
+```python
+class ProductSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(write_only=True)
+
+    class Meta:
+        model = Product
+        fields = ["id", "title", "price", "email"]
+```
+
+### What happens now?
+
+* ✅ Email shows up in browsable API form
+* ❌ Email not shown in response
+* ❌ Still causes error unless handled in `create()`
+
+---
+
+## 3️⃣ Why Error Still Happens
+
+Even with `write_only=True`:
+
+```python
+serializer.save()
+```
+
+Internally does:
+
+```python
+Product.objects.create(**validated_data)
+```
+
+But `validated_data` still contains:
+
+```python
+{"title": "...", "price": 100, "email": "..."}
+```
+
+❌ Product model doesn’t accept `email`
+
+---
+
+## 4️⃣ Overriding `create()` (Core Concept)
+
+### Default DRF behavior (simplified)
+
+```python
+def create(self, validated_data):
+    return Product.objects.create(**validated_data)
+```
+
+So we **override it**.
+
+---
+
+### Custom `create()` with extra field
+
+```python
+class ProductSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(write_only=True)
+
+    class Meta:
+        model = Product
+        fields = ["id", "title", "price", "email"]
+
+    def create(self, validated_data):
+        email = validated_data.pop("email")  # remove extra field
+
+        product = Product.objects.create(**validated_data)
+
+        # example side effect
+        print("Send email to:", email)
+
+        return product
+```
+
+---
+
+### Why `pop()` is important
+
+* Removes non-model fields
+* Prevents DB errors
+* Lets you use data for side-effects (email, logging, analytics)
+
+---
+
+## 5️⃣ `validated_data` — Very Important
+
+### What is it?
+
+* Cleaned + validated input data
+* Only exists **after validation**
+* Used by `create()` and `update()`
+
+Example:
+
+```python
+validated_data = {
+    "title": "Laptop",
+    "price": 50000,
+    "email": "abc@gmail.com"
+}
+```
+
+---
+
+## 6️⃣ Where Does `create()` Get Called From?
+
+### Key Insight
+
+```python
+serializer.save()
+```
+
+DRF decides:
+
+| Condition       | Method Called                      |
+| --------------- | ---------------------------------- |
+| No instance     | `create(validated_data)`           |
+| Instance exists | `update(instance, validated_data)` |
+
+You **never call `create()` manually**.
+
+---
+
+## 7️⃣ Doing the Same Logic in the View (`perform_create`)
+
+### Alternative approach
+
+```python
+class ProductListCreateView(ListCreateAPIView):
+    serializer_class = ProductSerializer
+
+    def perform_create(self, serializer):
+        email = serializer.validated_data.pop("email")
+        product = serializer.save()
+        print("Send email to:", email)
+```
+
+### Why this works
+
+* `validated_data` is available **before** save
+* `serializer.save()` triggers `create()`
+
+---
+
+### Which is better?
+
+✅ **Serializer** (recommended)
+
+* Reusable
+* Works everywhere
+* Cleaner architecture
+
+❌ View
+
+* Tied to one endpoint
+
+---
+
+## 8️⃣ `update()` Method Explained
+
+### Default behavior (simplified)
+
+```python
+def update(self, instance, validated_data):
+    instance.title = validated_data.get("title", instance.title)
+    instance.price = validated_data.get("price", instance.price)
+    instance.save()
+    return instance
+```
+
+---
+
+### Custom `update()` with extra field
+
+```python
+def update(self, instance, validated_data):
+    email = validated_data.pop("email", None)
+
+    instance = super().update(instance, validated_data)
+
+    if email:
+        print("Send update email to:", email)
+
+    return instance
+```
+
+---
+
+### Key Points
+
+* `instance.save()` is handled automatically
+* You don’t need to save again
+* `super().update()` is safest
+
+---
+
+## 9️⃣ `serializer.save()` vs `model.save()`
+
+| Method              | Purpose                        |
+| ------------------- | ------------------------------ |
+| `serializer.save()` | Calls `create()` or `update()` |
+| `model.save()`      | Saves an existing instance     |
+
+**Serializer = business logic layer**
+
+---
+
+## 🔟 Adding Arbitrary Fields — Summary
+
+### You can add fields that:
+
+* ❌ Don’t exist in model
+* ✅ Are used for:
+
+  * Emails
+  * Flags
+  * Tracking
+  * Temporary metadata
+
+### Rules
+
+✔ Must be `write_only=True`
+✔ Must be removed from `validated_data`
+✔ Best handled in serializer
+
+---
+
+## Final Takeaways (Exam / Interview Ready)
+
+### 🔑 Core Truths
+
+* `ModelSerializer.create()` → object creation
+* `ModelSerializer.update()` → object modification
+* `serializer.save()` chooses which one to call
+* `validated_data` is the clean input
+* Non-model fields must be popped
+
+### ⭐ Best Practice
+
+> “Side effects like emails, logging, or analytics should live in the serializer’s create/update methods, not the view.”
+
+---
+
 summaries this tutorial transcript in markdown form also make note of all important pointers
