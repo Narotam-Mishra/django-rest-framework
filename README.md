@@ -6376,6 +6376,115 @@ def update(self, instance, validated_data):
 * `super().update()` is safest
 
 ---
+ß
+## Where is `serializer.save()` called **in two places**?
+
+## 1️⃣ **In the Generic API View (View Layer)**
+
+This is the **explicit call you usually see**.
+
+Example (ListCreateAPIView):
+
+```python
+class ProductListCreateAPIView(ListCreateAPIView):
+    serializer_class = ProductSerializer
+
+    def perform_create(self, serializer):
+        serializer.save()
+```
+
+### What’s happening here?
+
+* DRF’s `create()` method on the view:
+
+  * validates data
+  * then calls `perform_create()`
+* `perform_create()` calls:
+
+```python
+serializer.save()
+```
+
+✅ **First place `serializer.save()` is called**
+
+---
+
+## 2️⃣ **Inside `serializer.save()` itself (Serializer Layer)**
+
+This is the **second place**, and it’s easy to miss.
+
+### Internally, `serializer.save()` does this:
+
+```python
+if self.instance is None:
+    return self.create(self.validated_data)
+else:
+    return self.update(self.instance, self.validated_data)
+```
+
+So:
+
+| Case            | What gets called                   |
+| --------------- | ---------------------------------- |
+| Creating object | `create(validated_data)`           |
+| Updating object | `update(instance, validated_data)` |
+
+> “serializer.save if there isn’t an instance will run the create method
+> if there *is* an instance it’s going to run another method called update”
+
+✅ **Second place `serializer.save()` effectively triggers logic**
+
+---
+
+## Putting It Together (Mental Model)
+
+### Request Flow for POST (Create)
+
+```
+HTTP POST
+  ↓
+View.create()
+  ↓
+perform_create()
+  ↓
+serializer.save()        ← (1st place)
+  ↓
+serializer.create()      ← (2nd place, internal)
+  ↓
+Model.objects.create()
+```
+
+---
+
+### Request Flow for PUT / PATCH (Update)
+
+```
+HTTP PUT/PATCH
+  ↓
+View.update()
+  ↓
+serializer.save()        ← (1st place)
+  ↓
+serializer.update()      ← (2nd place, internal)
+  ↓
+instance.save()
+```
+
+---
+
+## ✅ Final Answer (Short & Precise)
+
+**`serializer.save()` is involved in two places:**
+
+1. **Explicitly in the view**, usually inside `perform_create()` or `perform_update()`
+2. **Internally inside the serializer**, where it automatically calls:
+
+   * `create(validated_data)` when creating
+   * `update(instance, validated_data)` when updating
+
+That’s the full picture — and once you see it, DRF suddenly feels much less “magical.”
+
+---
 
 ## 9️⃣ `serializer.save()` vs `model.save()`
 
