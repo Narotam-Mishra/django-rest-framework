@@ -6858,4 +6858,292 @@ Custom validation in DRF is **layered and flexible**:
 
 ---
 
+## 📌 Request User Data & Customizing QuerySets in DRF
+
+It focuses on **associating data with users**, **restricting data visibility**, and **automatically assigning ownership** in Django REST Framework.
+
+---
+
+## 1️⃣ Attaching a User to a Model (ForeignKey)
+
+### Key Points
+
+* Each product belongs to a user
+* Use `settings.AUTH_USER_MODEL` instead of `auth.User`
+* Supports future customization of the User model
+* Avoid cascading deletes when a user is removed
+
+### Example
+
+```python
+# models.py
+from django.conf import settings
+from django.db import models
+
+class Product(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=False,
+        default=1   # assumes a default user exists
+    )
+    title = models.CharField(max_length=255, unique=True)
+```
+
+✅ **Why use `settings.AUTH_USER_MODEL`?**
+
+* Django-recommended
+* Safer if you ever customize the User model
+
+---
+
+## 2️⃣ Running Migrations After Model Changes
+
+Whenever models change:
+
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+---
+
+## 3️⃣ Exposing User Field in the Serializer (Temporarily)
+
+Used for debugging and validation.
+
+```python
+# serializers.py
+class ProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = ['user', 'title']
+```
+
+⚠️ **Later removed** because:
+
+* Users should not control ownership manually
+* Ownership should come from `request.user`
+
+---
+
+## 4️⃣ Accessing `request.user` in Views
+
+### Important Distinction
+
+| Location   | How to Access                      |
+| ---------- | ---------------------------------- |
+| View       | `self.request.user`                |
+| Serializer | `self.context.get("request").user` |
+
+### Example
+
+```python
+def get_queryset(self):
+    print(self.request.user)
+    return super().get_queryset()
+```
+
+---
+
+## 5️⃣ Filtering QuerySet by Logged-In User
+
+### Goal
+
+Only return objects owned by the logged-in user.
+
+```python
+def get_queryset(self):
+    user = self.request.user
+    if user.is_authenticated:
+        return Product.objects.filter(user=user)
+    return Product.objects.none()
+```
+
+✅ Ensures:
+
+* Users see only their own products
+* Unauthorized users see nothing
+
+---
+
+## 6️⃣ Automatically Assigning User on Create
+
+### Problem
+
+User field removed from serializer → who sets it?
+
+### Solution: `perform_create`
+
+```python
+def perform_create(self, serializer):
+    serializer.save(user=self.request.user)
+```
+
+✔ Prevents:
+
+* User spoofing
+* Manual ownership assignment
+
+---
+
+## 7️⃣ Why Remove `user` From Serializer?
+
+* Ownership should be **implicit**
+* Logged-in user = owner
+* Cleaner API design
+
+```python
+# serializers.py
+fields = ['title']
+```
+
+---
+
+## 8️⃣ Unique Validator Issue (Cross-User Conflict)
+
+### Problem
+
+Two different users could not create products with the same title.
+
+### Why?
+
+Default unique validator checks **globally**, not per user.
+
+### Fix
+
+Use `iexact` lookup or scoped validation.
+
+```python
+validators = [
+    UniqueValidator(
+        queryset=Product.objects.all(),
+        lookup='iexact'
+    )
+]
+```
+
+✔ Ensures case-insensitive uniqueness
+
+---
+
+## 9️⃣ Creating a Reusable User QuerySet Mixin
+
+### Why?
+
+* Avoid repeating `get_queryset`
+* Clean and reusable
+* Centralized ownership filtering
+
+### Mixin Implementation
+
+```python
+class UserQuerySetMixin:
+    user_field = 'user'
+    allow_staff_view = False
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+
+        if user.is_staff and self.allow_staff_view:
+            return qs
+
+        lookup = {self.user_field: user}
+        return qs.filter(**lookup)
+```
+
+---
+
+## 🔁 Dynamic Field Filtering Explained
+
+```python
+lookup = {self.user_field: user}
+qs.filter(**lookup)
+```
+
+Equivalent to:
+
+```python
+qs.filter(user=request.user)
+```
+
+🔑 Useful when field name changes (e.g., `owner`, `created_by`)
+
+---
+
+## 🔟 Using the Mixin in Views
+
+```python
+class ProductListCreateView(
+    UserQuerySetMixin,
+    generics.ListCreateAPIView
+):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+```
+
+---
+
+## 1️⃣1️⃣ Allowing Staff/Admin to See Everything
+
+```python
+allow_staff_view = True
+```
+
+✔ Staff → all records
+✔ Normal users → own records only
+
+---
+
+## 1️⃣2️⃣ Why Permissions Alone Are Not Enough
+
+### Problem
+
+Permissions allow access, but **querysets define visibility**
+
+### Correct Approach
+
+✔ Combine:
+
+* **Permissions** → can access?
+* **QuerySets** → what data?
+
+---
+
+## 1️⃣3️⃣ Security Best Practice Highlight
+
+> **Least Privilege Principle**
+
+* Default → restrictive
+* Explicitly allow broader access
+* Prevent accidental data leaks
+
+---
+
+## 1️⃣4️⃣ Key Takeaways
+
+### ✔ What You Learned
+
+* How to associate models with users
+* How to access `request.user`
+* How to auto-assign ownership
+* How to restrict querysets per user
+* How to create reusable mixins
+* Why permissions ≠ data access
+* Why serializers should not expose ownership fields
+
+---
+
+## 🔜 What’s Next (Mentioned in Tutorial)
+
+➡ **Foreign key / related field serialization**
+
+* Display user info safely
+* Nested serializers
+* Read-only relationships
+
+---
+
 summaries this tutorial transcript in markdown form also make note of all important pointers
