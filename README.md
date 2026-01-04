@@ -7146,7 +7146,7 @@ Permissions allow access, but **querysets define visibility**
 
 ---
 
-## 📌 Tutorial Summary: Related Fields & Foreign Key Serialization (DRF)
+## 📌 Related Fields & Foreign Key Serialization (DRF)
 
 This section explains **how to serialize related data** (ForeignKey & reverse relationships) in Django REST Framework, **why some approaches are bad**, and **which ones are preferred in production**.
 
