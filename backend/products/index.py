@@ -4,6 +4,7 @@ from algoliasearch_django.decorators import register
 
 @register(Product)
 class ProductIndex(AlgoliaIndex):
+    should_index = 'is_public'
     fields = [
         'title',
         'content',
@@ -11,6 +12,7 @@ class ProductIndex(AlgoliaIndex):
         'user_id',
         'public',
     ]
+    tags = 'get_tags_list'
 
     def get_user_id(self, instance):
         """Custom method to safely get user ID"""
