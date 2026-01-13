@@ -8471,4 +8471,8 @@ This tutorial demonstrates:
 
 ---
 
+Agolia Search Client for Django
+
+- [Search an index](https://www.algolia.com/doc/libraries/sdk/methods/search/search-single-index)
+
 summaries this tutorial transcript in markdown form also make note of all important pointers
