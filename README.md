@@ -8883,4 +8883,338 @@ Hints:
 
 ---
 
+## JSON Web Token (JWT) Authentication – SimpleJWT (Django REST Framework)
+
+## What Is JWT? (Very Important Concept)
+
+**JWT (pronounced “jot”)** is a **stateless authentication mechanism**.
+
+### Key Characteristics
+
+* ❌ Token is **NOT stored in the database**
+* ✅ Token contains **encoded user information**
+* ✅ Token has **expiration**
+* ✅ Token is sent on every request via HTTP headers
+
+JWT is different from DRF’s `TokenAuthentication`, which **stores tokens in DB**.
+
+---
+
+## JWT Uses 3 Endpoints
+
+SimpleJWT provides **three built-in endpoints**:
+
+| Endpoint              | Purpose                       |
+| --------------------- | ----------------------------- |
+| `/api/token/`         | Obtain access + refresh token |
+| `/api/token/refresh/` | Refresh access token          |
+| `/api/token/verify/`  | Verify token validity         |
+
+---
+
+## 1. Installing SimpleJWT
+
+### `requirements.txt`
+
+```txt
+djangorestframework-simplejwt
+```
+
+### Install
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## 2. Add SimpleJWT to Django Settings
+
+### `settings.py`
+
+```python
+INSTALLED_APPS = [
+    ...
+    'rest_framework',
+    'rest_framework_simplejwt',
+]
+```
+
+---
+
+## 3. Configure Authentication Classes
+
+### `settings.py`
+
+```python
+from rest_framework.settings import api_settings
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    )
+}
+```
+
+### ⚠️ Order Matters
+
+Django tries authentication **top → bottom**.
+
+Wrong order can cause:
+
+```
+Invalid token
+```
+
+---
+
+## 4. Add JWT URLs
+
+### `api/urls.py`
+
+```python
+from django.urls import path
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+    TokenVerifyView,
+)
+
+urlpatterns = [
+    path('token/', TokenObtainPairView.as_view(), name='token_obtain'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
+]
+```
+
+📌 These paths **must match your client expectations**
+(e.g. `/api/token/`)
+
+---
+
+## 5. Token Types Explained
+
+### Access Token
+
+* Short-lived
+* Used in API requests
+* Sent in headers
+
+### Refresh Token
+
+* Longer-lived
+* Used only to get a new access token
+* Not sent with every request
+
+---
+
+## 6. Authorization Header Format
+
+```http
+Authorization: Bearer <access_token>
+```
+
+* `Bearer` is default
+* Both JWT and DRF TokenAuth use `Bearer`
+* Causes conflicts if both are enabled
+
+---
+
+## 7. Token Expiration Configuration
+
+### Why Important?
+
+* Limits damage if token is stolen
+* Forces re-authentication
+
+### `settings.py`
+
+```python
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(seconds=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(minutes=1),
+}
+```
+
+### Typical Production Values
+
+```python
+ACCESS_TOKEN_LIFETIME = timedelta(minutes=5)
+REFRESH_TOKEN_LIFETIME = timedelta(days=1)
+```
+
+---
+
+## 8. Understanding JWT Payload (Security Insight)
+
+JWT contains **encoded (not encrypted)** data.
+
+Example payload:
+
+```json
+{
+  "user_id": 1,
+  "token_type": "access",
+  "exp": 1710000000
+}
+```
+
+### ⚠️ Important Security Rule
+
+❌ Do NOT store:
+
+* Email
+* Username
+* Personal data
+
+✅ Store:
+
+* `user_id` only
+
+> If you need user info → make an API call
+
+---
+
+## 9. Why “Invalid Token” Happened
+
+### Root Cause
+
+Both JWT and DRF TokenAuth use:
+
+```http
+Authorization: Bearer
+```
+
+### Solutions
+
+1. ✅ **Remove TokenAuthentication**
+2. ✅ Fix authentication class order
+3. ❌ Changing header type (not recommended)
+
+Correct solution used:
+
+```python
+'DEFAULT_AUTHENTICATION_CLASSES': (
+    'rest_framework_simplejwt.authentication.JWTAuthentication',
+)
+```
+
+---
+
+## 10. How Token Refresh Works
+
+### Refresh Request
+
+```http
+POST /api/token/refresh/
+{
+  "refresh": "<refresh_token>"
+}
+```
+
+### Response
+
+```json
+{
+  "access": "new_access_token"
+}
+```
+
+* Refresh token stays same
+* Access token changes
+* Client overwrites old access token
+
+---
+
+## 11. Token Verification
+
+### Verify Token
+
+```http
+POST /api/token/verify/
+{
+  "token": "<access_token>"
+}
+```
+
+* Confirms token integrity
+* Detects tampering
+* Optional but recommended
+
+---
+
+## 12. Client-Side Flow (Python / JS)
+
+### Typical Authentication Flow
+
+1. Login → `/api/token/`
+2. Save tokens (e.g. `creds.json`, localStorage)
+3. Send access token with requests
+4. If expired → refresh
+5. If refresh expired → login again
+
+---
+
+## 13. Simulating Logout
+
+JWT is stateless → no server logout.
+
+### Client Logout Means:
+
+```bash
+delete creds.json
+```
+
+Or in frontend:
+
+```js
+localStorage.removeItem("access");
+localStorage.removeItem("refresh");
+```
+
+---
+
+## 14. Why JWT Is Popular
+
+✔ No DB lookups
+✔ Fast
+✔ Scales well
+✔ Token expiration control
+✔ Refresh mechanism
+✔ Widely supported
+
+---
+
+## 15. JWT vs TokenAuthentication (Comparison)
+
+| Feature      | TokenAuth | JWT |
+| ------------ | --------- | --- |
+| Stored in DB | ✅         | ❌   |
+| Stateless    | ❌         | ✅   |
+| Expiration   | ❌         | ✅   |
+| Refresh      | ❌         | ✅   |
+| Scalable     | ⚠️        | ✅   |
+
+---
+
+## Final Key Takeaways 🔥
+
+* JWT tokens are **not stored in DB**
+* Use **SimpleJWT** (recommended by DRF)
+* Access tokens are **short-lived**
+* Refresh tokens extend sessions
+* Auth class order **matters**
+* Do not store sensitive data in JWT
+* Client controls login/logout
+* JWT is ideal for **SPA + Mobile apps**
+
+- [Simple JWT](https://django-rest-framework-simplejwt.readthedocs.io/en/latest/getting_started.html)
+
+- [JSON Web Token Authentication](https://www.django-rest-framework.org/api-guide/authentication/#json-web-token-authentication)
+
+---
+
 summaries this tutorial transcript in markdown form also make note of all important pointers
