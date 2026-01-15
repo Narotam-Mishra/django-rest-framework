@@ -20,16 +20,19 @@ class ProductSerializer(serializers.ModelSerializer):
     # my_user_data = serializers.SerializerMethodField(read_only=True)
     # my_discount = serializers.SerializerMethodField(read_only=True)
     # url = serializers.SerializerMethodField(read_only=True)
-    edit_url = serializers.SerializerMethodField(read_only=True)
+    # edit_url = serializers.SerializerMethodField(read_only=True)
     
-    url = serializers.HyperlinkedIdentityField(
-        view_name = 'product-detail',
-        lookup_field='pk',
-    )
+    # url = serializers.HyperlinkedIdentityField(
+    #     view_name = 'product-detail',
+    #     lookup_field='pk',
+    # )
+
     # email = serializers.EmailField(write_only=True)
     
     title = serializers.CharField(validators=[validators.validate_title_custom, validators.unique_product_title])
     # title = serializers.EmailField(validators=[validators.validate_title_custom, validators.unique_product_title])
+
+    body = serializers.CharField(source='content')
 
     # name = serializers.CharField(source='title', read_only=True)
     # email = serializers.EmailField(source='user.email', read_only=True)
@@ -39,15 +42,16 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             'owner',
             # 'email',
-            'url',
-            'edit_url',
+            # 'url',
+            # 'edit_url',
             'pk',
             'title', 
             # 'name',
-            'content', 
+            'body', 
             'price',
             'sale_price',
             'public',
+            'path',
             # 'my_discount',
             # 'my_user_data',
             # 'related_products',
