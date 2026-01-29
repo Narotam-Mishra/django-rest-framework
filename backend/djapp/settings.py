@@ -157,6 +157,6 @@ ALGOLIA = {
 
 SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ["Bearer"],
-    "ACCESS_TOKEN_LIFETIME": datetime.timedelta(seconds=30),
-    "REFRESH_TOKEN_LIFETIME": datetime.timedelta(minutes=10),
+    "ACCESS_TOKEN_LIFETIME": datetime.timedelta(seconds=30), # minutes=5
+    "REFRESH_TOKEN_LIFETIME": datetime.timedelta(minutes=2), # days=1
 }
