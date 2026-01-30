@@ -15,12 +15,12 @@ function handleLogin(event){
     let loginFormData = new FormData(loginForm);
     let loginObjData = Object.fromEntries(loginFormData);
     let bodyStr = JSON.stringify(loginObjData);
-    console.log("Login Data:", loginObjData, "Body String:", bodyStr);
+    // console.log("Login Data:", loginObjData, "Body String:", bodyStr);
 
     const options = {
         method: "POST",
         headers: {
-            "ContentType": "application/json"
+            "Content-Type": "application/json"
         },
         body: bodyStr,
     }
