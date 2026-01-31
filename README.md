@@ -9307,7 +9307,7 @@ These are **separate from Django**, simulating a real frontend.
 
 ```bash
 cd js_client
-python -m http.server 8111
+python3 -m http.server 8111
 ```
 
 Open in browser:
@@ -10208,6 +10208,299 @@ Failure → logout
 * Auto token refresh
 * Protected routes
 * Real-world frontend-backend auth
+
+---
+
+## 🔍 Search via REST API & JavaScript Client — Tutorial Summary & Notes
+
+## 1️⃣ What This Tutorial Is About
+
+This tutorial demonstrates how to:
+
+* Build a **search form** in HTML
+* Handle search using **JavaScript (client-side)**
+* Send search queries using **GET requests**
+* Use **URL query parameters**
+* Conditionally attach **Authorization tokens**
+* Handle **authenticated & unauthenticated searches**
+* Gracefully manage **empty results & invalid tokens**
+
+---
+
+## 2️⃣ Search Form Setup (HTML)
+
+### Key Points
+
+* Input field name must be `q` (query)
+* Method is `GET`
+* Form submission is handled by JavaScript
+* No password or POST body needed
+
+### Example
+
+```html
+<form id="search-form" method="get">
+  <input
+    type="text"
+    name="q"
+    placeholder="Your search"
+    required
+  />
+  <button type="submit">Search</button>
+</form>
+```
+
+---
+
+## 3️⃣ Handling Search on Client Side (JavaScript)
+
+### Key Concepts
+
+* Prevent default form submission
+* Extract form data
+* Convert form data into URL query parameters
+* Call REST API using `fetch`
+
+---
+
+## 4️⃣ Using `URLSearchParams` (IMPORTANT)
+
+### Why?
+
+GET requests don’t have a request body.
+Search data must be sent via **URL parameters**.
+
+### Concept
+
+```js
+const params = new URLSearchParams(formData);
+```
+
+This converts:
+
+```js
+{ q: "hello world" }
+```
+
+into:
+
+```text
+?q=hello+world
+```
+
+---
+
+## 5️⃣ JavaScript Search Handler
+
+### Example
+
+```js
+const searchForm = document.getElementById("search-form");
+
+searchForm.addEventListener("submit", handleSearch);
+
+async function handleSearch(e) {
+  e.preventDefault();
+
+  const formData = new FormData(searchForm);
+  const searchParams = new URLSearchParams(formData);
+
+  const endpoint = `/search?${searchParams}`;
+
+  const response = await fetch(endpoint, {
+    method: "GET",
+    headers: getHeaders()
+  });
+
+  const data = await response.json();
+  console.log(data.hits);
+}
+```
+
+---
+
+## 6️⃣ Understanding the API Response
+
+### Example Response Shape
+
+```js
+{
+  hits: [
+    { title: "Hello World", id: 1 },
+    { title: "Hello JS", id: 2 }
+  ]
+}
+```
+
+### Accessing Results
+
+```js
+data.hits
+```
+
+You can iterate and render them if needed.
+
+---
+
+## 7️⃣ Authorization Handling (JWT Token)
+
+### Key Problem
+
+* Some searches require authentication
+* Token may or may not exist
+* Invalid token should not break the app
+
+---
+
+## 8️⃣ Conditional Authorization Header (VERY IMPORTANT)
+
+### Pattern Used
+
+```js
+function getHeaders() {
+  const headers = {
+    "Content-Type": "application/json"
+  };
+
+  const authToken = localStorage.getItem("access");
+
+  if (authToken) {
+    headers.Authorization = `Bearer ${authToken}`;
+  }
+
+  return headers;
+}
+```
+
+### Why This Is Good Design
+
+✔ Works for public & protected endpoints
+✔ Avoids sending invalid tokens
+✔ Prevents unnecessary auth errors
+
+---
+
+## 9️⃣ Token Validation Flow (Conceptual)
+
+### What Happens
+
+| Situation     | Result                      |
+| ------------- | --------------------------- |
+| Valid token   | Search succeeds             |
+| No token      | Public search works         |
+| Invalid token | API returns `token invalid` |
+
+### Ideal Improvement
+
+* Backend validates token
+* Frontend handles invalid token:
+
+  * Clear token
+  * Ask user to log in again
+
+---
+
+## 🔟 Handling UI States (Results / No Results)
+
+### Important UI Logic
+
+* Clear previous results
+* Check if `hits.length === 0`
+* Show meaningful messages
+
+### Example
+
+```js
+const container = document.getElementById("results");
+
+container.innerHTML = "";
+
+if (!data.hits || data.hits.length === 0) {
+  container.innerText = "No results found";
+  return;
+}
+
+data.hits.forEach(hit => {
+  const div = document.createElement("div");
+  div.innerText = hit.title;
+  container.appendChild(div);
+});
+```
+
+---
+
+## 1️⃣1️⃣ Handling Invalid Tokens Gracefully
+
+### Better UX Approach
+
+```js
+if (data.error === "token invalid") {
+  localStorage.removeItem("access");
+  alert("Session expired. Please log in again.");
+}
+```
+
+---
+
+## 1️⃣2️⃣ Why This Search Implementation Is Limited
+
+### Current Limitations
+
+* No auto-suggestions
+* Search only happens on submit
+* Manual UI handling
+* No real-time feedback
+
+---
+
+## 1️⃣3️⃣ Why Algolia InstantSearch Is Introduced
+
+### Algolia Solves:
+
+✔ Live search suggestions
+✔ Typing-based results
+✔ Ranking & typo tolerance
+✔ Better performance
+
+### Flow Stays Same
+
+* Same data
+* Same backend
+* Better frontend experience
+
+---
+
+## 1️⃣4️⃣ Key Takeaways (EXAM / INTERVIEW READY)
+
+### Must Remember
+
+* `GET` → use `URLSearchParams`
+* Never send body with `GET`
+* JWT should be **optional & conditional**
+* Always validate token
+* Always handle empty results
+* Clear UI before rendering new results
+* Frontend ≠ authentication authority
+
+---
+
+## 1️⃣5️⃣ Architecture Summary
+
+```
+User Input
+   ↓
+JavaScript Client
+   ↓
+URLSearchParams (?q=...)
+   ↓
+REST API (/search)
+   ↓
+Backend Search Engine
+   ↓
+JSON Response
+   ↓
+UI Rendering
+```
 
 ---
 

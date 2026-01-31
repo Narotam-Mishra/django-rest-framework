@@ -3,10 +3,51 @@ const productContainer = document.getElementById('product-container')
 
 const loginForm = document.getElementById('login-form')
 
+const searchForm = document.getElementById('search-form')
+
 const baseEndpoint = "http://localhost:8000/api"
 
 if(loginForm){
     loginForm.addEventListener('submit', handleLogin)
+}
+
+if(searchForm){
+    searchForm.addEventListener('submit', handleSearch)
+}
+
+function handleSearch(event){
+    event.preventDefault()
+
+    let formData = new FormData(searchForm);
+    let data = Object.fromEntries(formData);
+    let searchParams = new URLSearchParams(data);
+
+    const searchEndpoint = `${baseEndpoint}/search/?${searchParams}`;
+    const headers = {
+        "Content-Type": "application/json",
+    }
+
+    const authToken = localStorage.getItem('access_token')
+    if(authToken){
+        headers['Authorization'] = `Bearer ${authToken}`
+    }
+
+    const options = {
+        method: "GET",
+        headers: headers,
+    }
+
+    fetch(searchEndpoint, options)
+    .then(res => {
+        return res.json()
+    })
+    .then(data => {
+        console.log("Data Hits:", data.hits)
+        addProductToContainer(data)
+    })
+    .catch(err => {
+        console.error("Error:", err)
+    })
 }
 
 function handleLogin(event){
