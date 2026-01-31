@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/instantsearch.css@8.10.0/themes/reset-min.css" integrity="sha256-MetkRItMiXM7wjU0awrA13/5UeKtcW3cyFfPh7ZJbOM=" crossorigin="anonymous">
     <title>Basic Form</title>
 </head>
 <body>
@@ -12,12 +13,20 @@
         <input type="submit" value="Login" />
     </form><br><br>
 
-    <form id="search-form" method="GET">
+    <form style="display: none;" id="search-form" method="GET">
         <input type="text" name="q" placeholder="Search here..." />
         <input type="submit" value="Search" />
     </form>
 
     <div id="product-container"></div>
+
+    <div id="search-box"></div>
+    <div id="clear-refinements"></div>
+    <div id="user-list"></div>
+    <div id="hits"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/algoliasearch@5.47.0/dist/lite/builds/browser.umd.js"
+        integrity="sha256-pjlEWJDMSr2FjjkMT0ZjDHs7smXzcanD07i0xm5mYho=" crossorigin="anonymous"></script>
     <script src="./client.js"></script>
 </body>
 </html>

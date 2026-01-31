@@ -160,3 +160,47 @@ function getProductList(){
 
 validateJWTToken()
 // getProductList();
+
+/*
+  Initialize the search client
+
+  If you're logged into the Algolia dashboard, the following values for
+  ALGOLIA_APPLICATION_ID and ALGOLIA_SEARCH_API_KEY are auto-selected from
+  the currently selected Algolia application.
+*/
+const { liteClient: algoliasearch } = window["algoliasearch/lite"];
+const searchClient = algoliasearch(
+  "1091QYUB5I",
+  "17f60c1a928771b475595ac14515077a",
+);
+
+// Render the InstantSearch.js wrapper
+// Replace INDEX_NAME with the name of your index.
+const search = instantsearch({
+  indexName: "djapp_Product",
+  searchClient,
+});
+
+search.addWidgets([
+  instantsearch.widgets.searchBox({
+    container: "#searchbox",
+  }),
+
+  instantsearch.widgets.clearRefinements({
+    container: "#clear-refinements",
+  }),
+
+  instantsearch.widgets.refinementList({
+    container: "#user-list",
+    attribute: 'user',
+  }),
+
+  instantsearch.widgets.hits({
+    container: "#hits",
+    templates: {
+        item: `<div>{{ title }}<p>\${{ price }}</div>`
+    }
+  }),
+]);
+
+search.start();
