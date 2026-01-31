@@ -9873,4 +9873,342 @@ Next steps typically include:
 
 ---
 
+---
+
+## 🔐 Using JWT with a JavaScript Client (Django + DRF)
+
+## 🎯 Goal of This Section
+
+Learn how to:
+
+* Store JWT tokens in the browser
+* Send JWT tokens with API requests
+* Handle expired / invalid tokens
+* Structure reusable `fetch` logic
+* Prepare for refresh-token flows
+
+---
+
+## 🧠 Big Picture Flow
+
+1. User logs in
+2. Backend returns:
+
+   * `access` token
+   * `refresh` token
+3. Tokens are stored in browser
+4. Access token is sent with API requests
+5. If token expires:
+
+   * Detect error
+   * Ask user to login again OR refresh token
+
+---
+
+## 1️⃣ Handling Login Response (Storing Tokens)
+
+### ✅ Why Store Tokens?
+
+JWT tokens are required to authenticate **future API calls**.
+
+---
+
+### 🔹 Store Tokens in `localStorage`
+
+```js
+function handleAuthData(authData) {
+  if (!authData?.access || !authData?.refresh) return;
+
+  localStorage.setItem("access", authData.access);
+  localStorage.setItem("refresh", authData.refresh);
+}
+```
+
+📌 Tokens are saved as **key–value pairs**
+
+---
+
+### 🔍 Where Can You See Them?
+
+In Chrome:
+
+```
+DevTools → Application → Local Storage
+```
+
+You’ll see:
+
+* `access`
+* `refresh`
+
+---
+
+## ⚠️ Security Notes (Important)
+
+* `localStorage` is **accessible via JS**
+* Vulnerable to **XSS attacks**
+* MUST use **HTTPS in production**
+
+👉 More secure alternatives:
+
+* HttpOnly cookies
+* Short-lived access tokens
+* Frequent refresh
+
+(Deep security discussion is beyond scope, as noted in the tutorial)
+
+---
+
+## 2️⃣ Making Authenticated API Requests
+
+### ❌ Without Token → Error
+
+```json
+{
+  "detail": "Authentication credentials were not provided."
+}
+```
+
+---
+
+### ✅ Add Authorization Header
+
+JWT standard format:
+
+```
+Authorization: Bearer <access_token>
+```
+
+---
+
+### 🔹 Fetch Example (GET Products)
+
+```js
+fetch("http://localhost:8000/api/products/", {
+  method: "GET",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${localStorage.getItem("access")}`
+  }
+})
+.then(res => res.json())
+.then(data => console.log(data))
+.catch(err => console.error(err));
+```
+
+✔️ If token is valid → data returned
+❌ If invalid → error response
+
+---
+
+## 3️⃣ Displaying API Data in HTML
+
+### HTML Container
+
+```html
+<div id="content-container"></div>
+```
+
+---
+
+### JS Utility Function
+
+```js
+const contentContainer = document.getElementById("content-container");
+
+function writeToContainer(data) {
+  if (!contentContainer) return;
+
+  contentContainer.innerHTML = `
+    <pre>${JSON.stringify(data, null, 4)}</pre>
+  `;
+}
+```
+
+📌 `JSON.stringify(data, null, 4)` = readable formatted output
+
+---
+
+## 4️⃣ Centralizing Fetch Options (Reusable Pattern)
+
+Instead of repeating headers everywhere:
+
+```js
+function getFetchOptions(method = "GET", body = null) {
+  const options = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${localStorage.getItem("access")}`
+    }
+  };
+
+  if (body) {
+    options.body = body;
+  }
+
+  return options;
+}
+```
+
+### Usage:
+
+```js
+fetch(endpoint, getFetchOptions())
+  .then(res => res.json())
+  .then(data => writeToContainer(data));
+```
+
+✔️ Cleaner
+✔️ Scalable
+✔️ Easier to maintain
+
+---
+
+## 5️⃣ Handling Expired or Invalid Tokens
+
+### Typical Backend Response
+
+```json
+{
+  "code": "token_not_valid",
+  "detail": "Given token not valid"
+}
+```
+
+---
+
+### 🔹 Detect Token Errors
+
+```js
+function isTokenNotValid(jsonData) {
+  return jsonData?.code === "token_not_valid";
+}
+```
+
+---
+
+### 🔹 Use It After Fetch
+
+```js
+fetch(endpoint, getFetchOptions())
+  .then(res => res.json())
+  .then(data => {
+    if (isTokenNotValid(data)) {
+      alert("Please login again");
+      localStorage.clear();
+      return;
+    }
+    writeToContainer(data);
+  });
+```
+
+✔️ Prevents app from silently failing
+✔️ Clean UX handling
+
+---
+
+## 6️⃣ Token Persistence on Page Refresh
+
+JWT tokens remain in `localStorage`, so:
+
+* Refreshing the page still allows API calls
+* Until token **expires**
+
+---
+
+### ⏱ Token Expiry
+
+* Access tokens are short-lived (e.g. 30s–5min)
+* After expiry:
+
+  * API returns `token_not_valid`
+  * Client must refresh or re-login
+
+---
+
+## 7️⃣ Token Verification on Page Load
+
+Django SimpleJWT provides:
+
+```
+/api/token/verify/
+```
+
+### Example: Verify Token on App Start
+
+```js
+function verifyToken() {
+  const token = localStorage.getItem("access");
+  if (!token) return;
+
+  fetch("http://localhost:8000/api/token/verify/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ token })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.code === "token_not_valid") {
+      localStorage.clear();
+      alert("Session expired. Please login again.");
+    }
+  });
+}
+```
+
+📌 Run this on page load
+
+---
+
+## 8️⃣ Refresh Token Strategy (Conceptual)
+
+When access token expires:
+
+1. Use `refresh` token
+2. Request new access token
+3. Retry original request
+4. If refresh fails → logout user
+
+🔁 Flow:
+
+```
+Access expired
+↓
+Try refresh
+↓
+Success → continue
+Failure → logout
+```
+
+💡 Tutorial challenge:
+
+> Implement refresh logic yourself using patterns you’ve learned
+
+---
+
+## 9️⃣ Key Takeaways (Interview-Ready)
+
+* JWT = stateless authentication
+* Access token → API access
+* Refresh token → get new access
+* Store tokens carefully
+* Always handle expiration
+* Centralize fetch logic
+* Detect auth failures explicitly
+
+---
+
+## 🧠 What This Prepares You For
+
+* React authentication flows
+* Axios interceptors
+* Auto token refresh
+* Protected routes
+* Real-world frontend-backend auth
+
+---
+
 summaries this tutorial transcript in markdown form also make note of all important pointers
